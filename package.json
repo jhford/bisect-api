@@ -1,0 +1,19 @@
+{
+  "name": "bisect-api",
+  "version": "0.0.0",
+  "description": "API to receive information that'll later be used to do bisects",
+  "main": "index.js",
+  "scripts": {
+    "test": "make"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jhford/bisect-api"
+  },
+  "author": "John Ford <john@johnford.org>",
+  "license": "GPL",
+  "bugs": {
+    "url": "https://github.com/jhford/bisect-api/issues"
+  },
+  "homepage": "https://github.com/jhford/bisect-api"
+}
