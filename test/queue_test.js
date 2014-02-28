@@ -2,7 +2,7 @@ var should = require('should');
 var redis = require('redis');
 var sinon = require('sinon');
 var subject = require('../queue.js');
-var debug = require('debug')('insert_test');
+var debug = require('debug')('queue_test');
 
 describe("inserting into queue", function() {
   var client;
@@ -101,6 +101,22 @@ describe("inserting into queue", function() {
 });
 
 describe('pulling from queue', function() {
-  
+  it('should get a valid repo name and commit', function(done) {
+    var expected_repo = 'repositoryA',
+        expected_commit = 'commit123';
+    
+    subject.insert(expected_repo, expected_commit, function(err) {
+      subject.pull(function(err, repo_name, commit, date) {
+        debug(repo_name + commit + date);
+        should.not.exist(err);
+        repo_name.should.equal(expected_repo);
+        commit.should.equal(expected_commit);
+        date.should.be.a.Number;
+        date.should.be.above(100000);
+        done(err);
+      });
+    });
+
+  });
 
 });
