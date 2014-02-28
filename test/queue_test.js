@@ -1,10 +1,10 @@
 var should = require('should');
 var redis = require('redis');
 var sinon = require('sinon');
-var subject = require('../insert.js');
+var subject = require('../queue.js');
 var debug = require('debug')('insert_test');
 
-describe("Insert", function() {
+describe("inserting into queue", function() {
   var client;
 
   beforeEach(function(done){
@@ -19,7 +19,7 @@ describe("Insert", function() {
   });
 
   it('should insert commit into queue', function(done) {
-    subject.queue('repo', 'abcd123', function(err) {
+    subject.insert('repo', 'abcd123', function(err) {
       client.rpop(subject.INCOMING_QUEUE_NAME, function(err, reply) {
         should.exist(reply);
         should.not.exist(err);
@@ -30,7 +30,7 @@ describe("Insert", function() {
   });
 
   it('should insert repository name into a hash', function(done) {
-    subject.queue('repo', 'abcd123', function(err) {
+    subject.insert('repo', 'abcd123', function(err) {
       client.hget('abcd123', 'repo_name', function(err, reply) {
         should.exist(reply);
         should.not.exist(err);
@@ -47,7 +47,7 @@ describe("Insert", function() {
       // and we want seconds to emulate unicode
       return 1393536842234;
     }
-    subject.queue('repo', 'abcd123', function(err) {
+    subject.insert('repo', 'abcd123', function(err) {
       client.hget('abcd123', 'time', function(err, reply) {
         should.exist(reply);
         should.not.exist(err);
@@ -70,7 +70,37 @@ describe("Insert", function() {
       done();
     });
 
-    subject.queue('repo', 'abcd123')
+    subject.insert('repo', 'abcd123', function(err){
+      should.not.exist(err); 
+    })
 
   });
-})
+
+  // Let's test some error handling!
+  describe('error handling', function() {
+    var sandbox;
+
+    beforeEach(function() {
+      sandbox = sinon.sandbox.create();
+    });
+
+    afterEach(function() {
+      sandbox.restore();
+    });
+
+    it('should fail if the insert transaction fails', function(done){
+      var multi_stub = sandbox.stub(redis.Multi.prototype, 'exec');
+      // The multi exec failure
+      multi_stub.callsArgWithAsync(0, new Error());
+      subject.insert('repo', 'abcd123', function(err){
+        should.exist(err);
+        done();
+      });
+    });
+  });
+});
+
+describe('pulling from queue', function() {
+  
+
+});

@@ -4,12 +4,12 @@ var debug = require('debug')('insert');
 var INCOMING_QUEUE_NAME = 'bisect::incoming';
 var INCOMING_QUEUE_CHANNEL = 'bisect::new_incoming';
 
-function queue(repo_name, commit, callback){
+function insert(repo_name, commit, callback){
   var client = redis.createClient();
   client.on("error", function(err) {
     debug("ERROR: " + err);
     if (callback) return callback(err);
-  })
+  });
   var to_store = {
     'repo_name': repo_name,
     'commit': commit,
@@ -31,8 +31,9 @@ function queue(repo_name, commit, callback){
   
 }
 
+
 module.exports = {
-  queue: queue,
+  insert: insert,
   INCOMING_QUEUE_NAME: INCOMING_QUEUE_NAME,
   INCOMING_QUEUE_CHANNEL: INCOMING_QUEUE_CHANNEL
 }
