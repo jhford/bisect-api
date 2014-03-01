@@ -65,7 +65,7 @@ describe("inserting into queue", function() {
       should.exist(msg);
       should.exist(channel);
       channel.should.equal(subject.INCOMING_QUEUE_CHANNEL);
-      msg.should.equal('published commit');
+      msg.should.equal('inserted_to_incoming');
       client.unsubscribe();
       done();
     });
@@ -88,26 +88,40 @@ describe("inserting into queue", function() {
       sandbox.restore();
     });
 
-    it('should fail if the insert transaction fails', function(done){
-      var multi_stub = sandbox.stub(redis.Multi.prototype, 'exec');
-      // The multi exec failure
-      multi_stub.callsArgWithAsync(0, new Error());
-      subject.insert('repo', 'abcd123', function(err){
-        should.exist(err);
-        done();
+    it('should not insert a commit that is already queued', function(done) {
+      client.hmset('abc123', 'key', 'value', function(err) {
+        should.not.exist(err);
+        subject.insert('repo', 'abc123', function(insert_err) {
+          should.exist(insert_err);
+          done();
+        });
       });
+      
+
     });
   });
 });
 
 describe('pulling from queue', function() {
+  var client;
+
+  beforeEach(function(done){
+    client = redis.createClient();
+    client.flushall(function(err){
+      done(err);
+    });
+  });
+
+  afterEach(function() {
+    client.end();
+  });
+
   it('should get a valid repo name and commit', function(done) {
     var expected_repo = 'repositoryA',
         expected_commit = 'commit123';
     
     subject.insert(expected_repo, expected_commit, function(err) {
       subject.pull(function(err, repo_name, commit, date) {
-        debug(repo_name + commit + date);
         should.not.exist(err);
         repo_name.should.equal(expected_repo);
         commit.should.equal(expected_commit);
@@ -116,7 +130,42 @@ describe('pulling from queue', function() {
         done(err);
       });
     });
-
   });
 
+  describe('there is an error', function() {
+    var sandbox, 
+        expected;
+
+    beforeEach(function(done) {
+      sandbox = sinon.sandbox.create(); 
+      expected = {
+        repo_name: 'repo_name',
+        commit: 'commit', 
+        time: 2500000
+      }
+      sandbox.stub(Date, 'now').returns(expected.time * 1000);
+      subject.insert(expected.repo_name, expected.commit, function(err) {
+        done(err); 
+      });
+    });
+
+    afterEach(function() {
+      sandbox.restore();
+    });
+
+    it('should fail if the pop fails', function(done) {
+      done();
+    });
+
+    it('should fail if the hash is missing', function(done) {
+      client.del(expected.commit, function(err) {
+        subject.pull(function(err) {
+          should.exist(err);
+          done();
+        });
+      });
+    });
+  });
 });
+
+// TODO: Write some unit tests of the lua script!

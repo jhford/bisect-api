@@ -1,16 +1,19 @@
 var redis = require('redis');
 var debug = require('debug')('queue');
+var fs = require('fs');
+var pull_script = require('./pull_script');
+var insert_script = require('./insert_script');
 
-var INCOMING_QUEUE_NAME = 'bisect::incoming';
-var INCOMING_QUEUE_CHANNEL = 'bisect::new_incoming';
+var INCOMING_QUEUE_NAME = 'bisect:incoming';
+var INCOMING_QUEUE_CHANNEL = 'bisect:new_incoming';
 
+// 
 function insert(repo_name, commit, callback){
   var client = redis.createClient();
   client.on("error", function(err) {
     debug("ERROR: " + err);
     if (callback) { 
-      debug('redis client error');
-      return callback(new Error('Redis error: ' + err));
+      return callback(err);
     }
   });
   var to_store = {
@@ -18,19 +21,21 @@ function insert(repo_name, commit, callback){
     'commit': commit,
     'time': Math.round(Date.now() / 1000)
   }
-  client.multi()
-    .hmset(commit, to_store)
-    .lpush(INCOMING_QUEUE_NAME, commit)
-    .publish(INCOMING_QUEUE_CHANNEL, 'published commit')
-    .exec(function (err, replies){
-      if (err) {
-        error = new Error('Redis error: ' + err);
-        return callback(err);
-      }
-      debug("Inserted " + commit + " into queue");
-      client.end()
-      if (callback) return callback(null);
-    })
+  client.eval(
+      insert_script,
+      1,
+      INCOMING_QUEUE_NAME,
+      INCOMING_QUEUE_CHANNEL,
+      commit,
+      repo_name,
+      Math.round(Date.now() / 1000),
+      function (err, reply) {
+        if (err)
+          return callback(err);
+        if (reply !== 'OK') 
+          return callback(new Error('Other insert script error'));
+        return callback();
+      });
   
 }
 
@@ -39,31 +44,37 @@ function pull(callback){
   client.on("error", function(err) {
     debug("ERROR: " + err);
     if (callback) {
-      debug('redis client error');
-      return callback(new Error('Redis error: ' + err));
+      return callback(err);
     }
   });
-  client.rpop(INCOMING_QUEUE_NAME, function(err, commit) {
-    if (err) {
-      debug('error trying to pop from incoming queue');
-      return callback(new Error('Redis error: ' + err));
+  client.eval(pull_script, 1, INCOMING_QUEUE_NAME, function(err, reply){
+    if (err)
+      return callback(err);
+    values = JSON.parse(reply);
+    return callback(null, values.repo_name, values.commit, parseInt(values.time, 10));
+  });
+}
+
+function view(callback) {
+  var client = redis.createClient();
+  client.on("error", function(err) {
+    debug("ERROR: " + err);
+    return callback(err);
+  });
+  client.lrange(INCOMING_QUEUE_NAME, 0, -1, function(err, replies) {
+    if (err) return callback(err);
+    var values;
+    for (var i ; i < replies.length ; i++) {
+      values.push(replies[i]);
     }
-    client.hgetall(commit, function(err, obj) {
-      debug('retreived ' + obj.repo_name + ' ' + obj.time);
-      client.del(commit, function(err, reply) {
-        client.end();
-        if (err) {
-          debug('WARNING: failed to delete hash for ' + commit);
-        }
-        return callback(null, obj.repo_name, commit, parseInt(obj.time, 10)); 
-      });
-    });
+    return callback(null, values);
   });
 }
 
 module.exports = {
   insert: insert,
   pull: pull,
+  view: view,
   INCOMING_QUEUE_NAME: INCOMING_QUEUE_NAME,
   INCOMING_QUEUE_CHANNEL: INCOMING_QUEUE_CHANNEL
 }
