@@ -168,4 +168,32 @@ describe('pulling from queue', function() {
   });
 });
 
+describe('viewing queue', function() {
+  var client;
+
+  beforeEach(function(done) {
+    client = redis.createClient();
+    client.flushall(function(err) {
+      done(err);
+    });
+  });
+
+  afterEach(function() {
+    client.end();
+  });
+
+  it('should work', function(done) {
+    subject.insert('repo', 'abc123', function(err) {
+      should.not.exist(err);
+      subject.view(function(err, values) {
+        should.exist(values);
+        values.length.should.equal(1);
+        done(err)
+      });
+
+    });
+  });
+
+});
+
 // TODO: Write some unit tests of the lua script!

@@ -59,15 +59,13 @@ function view(callback) {
   var client = redis.createClient();
   client.on("error", function(err) {
     debug("ERROR: " + err);
-    return callback(err);
-  });
+    if (callback) {
+      return callback(err);
+    }
+  });  
   client.lrange(INCOMING_QUEUE_NAME, 0, -1, function(err, replies) {
     if (err) return callback(err);
-    var values;
-    for (var i ; i < replies.length ; i++) {
-      values.push(replies[i]);
-    }
-    return callback(null, values);
+    callback(null, replies);
   });
 }
 
