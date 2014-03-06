@@ -1,8 +1,6 @@
 var redis = require('redis');
 var debug = require('debug')('queue');
 var fs = require('fs');
-var pull_script = require('./pull_script');
-var insert_script = require('./insert_script');
 
 var INCOMING_QUEUE_NAME = 'bisect:incoming';
 var INCOMING_QUEUE_CHANNEL = 'bisect:new_incoming';
@@ -12,7 +10,7 @@ function insert(repo_name, commit, callback){
   var client = redis.createClient();
   client.on("error", function(err) {
     debug("ERROR: " + err);
-    if (callback) { 
+    if (err) { 
       return callback(err);
     }
   });
@@ -21,21 +19,18 @@ function insert(repo_name, commit, callback){
     'commit': commit,
     'time': Math.round(Date.now() / 1000)
   }
-  client.eval(
-      insert_script,
-      1,
-      INCOMING_QUEUE_NAME,
-      INCOMING_QUEUE_CHANNEL,
-      commit,
-      repo_name,
-      Math.round(Date.now() / 1000),
-      function (err, reply) {
-        if (err)
-          return callback(err);
-        if (reply !== 'OK') 
-          return callback(new Error('Other insert script error'));
-        return callback();
-      });
+  client.multi()
+    .lpush(INCOMING_QUEUE_NAME, JSON.stringify(to_store))
+    .publish(INCOMING_QUEUE_CHANNEL, "incoming_change")
+    .exec(function(err) {
+      client.end();
+      if (err) {
+        return callback(err);
+      } else {
+        return callback(null);
+      }
+    });
+  
   
 }
 
@@ -43,15 +38,27 @@ function pull(callback){
   var client = redis.createClient();
   client.on("error", function(err) {
     debug("ERROR: " + err);
-    if (callback) {
+    if (err) {
       return callback(err);
     }
   });
-  client.eval(pull_script, 1, INCOMING_QUEUE_NAME, function(err, reply){
-    if (err)
+  client.rpop(INCOMING_QUEUE_NAME, function(err, reply){
+    var data;
+    if (err) {
       return callback(err);
-    values = JSON.parse(reply);
-    return callback(null, values.repo_name, values.commit, parseInt(values.time, 10));
+    }
+
+    try {
+      data = JSON.parse(reply);
+    } catch(e) {
+      return callback(new Error("invalid json from queue"));
+    }
+
+    if (data && data.repo_name && data.commit && data.time) {
+      return callback(null, data.repo_name, data.commit, data.time);
+    } else {
+      return callback(new Error("Missing repo_name, commit or time"));
+    }
   });
 }
 
@@ -59,7 +66,7 @@ function view(callback) {
   var client = redis.createClient();
   client.on("error", function(err) {
     debug("ERROR: " + err);
-    if (callback) {
+    if (err) {
       return callback(err);
     }
   });  
