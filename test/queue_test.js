@@ -5,30 +5,31 @@ var sinon = require('sinon');
 var subject = require('../queue.js');
 var debug = require('debug')('queue_test');
 
+describe("Queue tests", function () {
+  var client,
+      sandbox,
+      expected;
+
+  beforeEach(function(done){
+    client = redis.createClient();
+    client.flushall(function(err){
+      done(err);
+    });
+    sandbox = sinon.sandbox.create();
+    expected = {
+      repo_name: 'insert_repo',
+      commit: 'abcd123',
+      time: 1393536842
+    }
+    sandbox.stub(Date, 'now').returns(expected.time * 1000);    
+  });
+
+  afterEach(function() {
+    client.end();
+    sandbox.restore();
+  });
+
   describe("inserting into queue", function() {
-    var client,
-        sandbox,
-        expected;
-
-    beforeEach(function(done){
-      client = redis.createClient();
-      client.flushall(function(err){
-        done(err);
-      });
-      sandbox = sinon.sandbox.create();
-      expected = {
-        repo_name: 'insert_repo',
-        commit: 'abcd123',
-        time: 1393536842
-      }
-      sandbox.stub(Date, 'now').returns(expected.time * 1000);    
-    });
-
-    afterEach(function() {
-      client.end();
-      sandbox.restore();
-    });
-
     it('should insert into queue', function(done) {
       subject.insert(expected.repo_name, expected.commit, function(err) {
         client.rpop(subject.INCOMING_QUEUE_NAME, function(err, reply) {
@@ -58,7 +59,6 @@ var debug = require('debug')('queue_test');
 
     });
 
-    // Let's test some error handling!
     describe('error handling', function() {
       it('should fail if the redis operation transaction fails', function(done) {
         var exec = sandbox.stub(redis.Multi.prototype, 'exec');
@@ -72,29 +72,6 @@ var debug = require('debug')('queue_test');
   });
 
   describe('pulling from queue', function() {
-    var client,
-        sandbox,
-        expected;
-
-    beforeEach(function(done){
-      client = redis.createClient();
-      client.flushall(function(err){
-        done(err);
-      });
-      sandbox = sinon.sandbox.create();
-      expected = {
-        repo_name: 'insert_repo',
-        commit: 'abcd123',
-        time: 1393536842
-      }
-      sandbox.stub(Date, 'now').returns(expected.time * 1000);    
-    });
-
-    afterEach(function() {
-      client.end();
-      sandbox.restore();
-    });
-
     it('should get a valid repo name, commit and time', function(done) {
       subject.insert(expected.repo_name, expected.commit, function(err) {
         if (err) return done(err);
@@ -137,3 +114,4 @@ var debug = require('debug')('queue_test');
     });
 
   });
+});
