@@ -5,7 +5,7 @@ var sinon = require('sinon');
 var subject = require('../queue.js');
 var debug = require('debug')('queue_test');
 
-describe("Queue tests", function () {
+describe("queue", function () {
   var client,
       sandbox,
       expected;
@@ -29,8 +29,8 @@ describe("Queue tests", function () {
     sandbox.restore();
   });
 
-  describe("inserting into queue", function() {
-    it('should insert into queue', function(done) {
+  describe('inserting', function() {
+    it('should work', function(done) {
       subject.insert(expected.repo_name, expected.commit, function(err) {
         client.rpop(subject.INCOMING_QUEUE_NAME, function(err, reply) {
           should.exist(reply);
@@ -59,7 +59,7 @@ describe("Queue tests", function () {
 
     });
 
-    describe('error handling', function() {
+    describe('on error', function() {
       it('should fail if the redis operation transaction fails', function(done) {
         var exec = sandbox.stub(redis.Multi.prototype, 'exec');
         exec.callsArgWithAsync(0, new Error());
@@ -71,16 +71,31 @@ describe("Queue tests", function () {
     });
   });
 
-  describe('pulling from queue', function() {
-    it('should get a valid repo name, commit and time', function(done) {
+  describe('pulling', function() {
+    beforeEach(function(done) {
       subject.insert(expected.repo_name, expected.commit, function(err) {
-        if (err) return done(err);
-        subject.pull(function(err, repo_name, commit, time) {
-          should.not.exist(err);
-          expected.should.eql({repo_name: repo_name, commit: commit, time: time});
-          time.should.be.a.Number;
-          time.should.be.above(100000);
-          done(err);
+        done(err)
+      }
+    });
+
+    it('should get a valid repo name, commit and time', function(done) {
+      if (err) return done(err);
+      subject.pull(function(err, repo_name, commit, time) {
+        should.not.exist(err);
+        expected.should.eql({repo_name: repo_name, commit: commit, time: time});
+        time.should.be.a.Number;
+        time.should.be.above(100000);
+        done(err);
+      });
+    });
+
+    describe('on error', function() {
+      it('should fail if the redis operation fails', function(done) {
+        var rpop = sandbox.stub(redis.RedisClient.prototype, 'rpop');
+        rpop.callsArgWithAsync(0, new Error());
+        subject.pull(function(err) {
+          should.exist(err);
+          done();
         });
       });
     });
@@ -88,25 +103,13 @@ describe("Queue tests", function () {
   });
 
   describe('viewing queue', function() {
-    var client;
-
-    beforeEach(function(done) {
-      client = redis.createClient();
-      client.flushall(function(err) {
-        done(err);
-      });
-    });
-
-    afterEach(function() {
-      client.end();
-    });
-
     it('should work', function(done) {
       subject.insert('repo', 'abc123', function(err) {
         //should.not.exist(err);
         subject.view(function(err, values) {
           should.exist(values);
           values.length.should.equal(1);
+          values[0].should.eql(expected);
           done(err)
         });
 
