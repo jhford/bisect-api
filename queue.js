@@ -80,10 +80,25 @@ function view(callback) {
   });
 }
 
+function count(callback) {
+  var client = redis.createClient();
+  client.on("error", function(err) {
+    debug("ERROR: " + err);
+    if (err) {
+      return callback(err);
+    }
+  });
+  client.llen(INCOMING_QUEUE_NAME, function(err, reply) {
+    if (err) return callback(err);
+    return callback(null, reply);
+  });
+}
+
 module.exports = {
   insert: insert,
   pull: pull,
   view: view,
+  count: count,
   INCOMING_QUEUE_NAME: INCOMING_QUEUE_NAME,
   INCOMING_QUEUE_CHANNEL: INCOMING_QUEUE_CHANNEL
 }

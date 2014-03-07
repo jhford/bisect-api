@@ -126,4 +126,23 @@ describe("queue", function () {
       });
     });
   });
+
+  describe('count', function() {
+    it('should be zero with no elements', function(done) {
+      subject.count(function (err, count) {
+        count.should.equal(0);
+        done(err);
+      });
+    });
+
+    it('should be one with one element', function(done) {
+      subject.insert('test', 'abcd123', function(err) {
+        if (err) return done(err);
+        subject.count(function(err, count) {
+          count.should.equal(1);
+          done(err);
+        });
+      });
+    });
+  });
 });
