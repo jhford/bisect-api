@@ -72,7 +72,11 @@ function view(callback) {
   });  
   client.lrange(INCOMING_QUEUE_NAME, 0, -1, function(err, replies) {
     if (err) return callback(err);
-    callback(null, replies);
+    var values = [];
+    replies.forEach(function(val, idx, arr) {
+      values.push(JSON.parse(val));
+    });
+    callback(null, values);
   });
 }
 

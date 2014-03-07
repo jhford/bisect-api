@@ -75,11 +75,10 @@ describe("queue", function () {
     beforeEach(function(done) {
       subject.insert(expected.repo_name, expected.commit, function(err) {
         done(err)
-      }
+      });
     });
 
     it('should get a valid repo name, commit and time', function(done) {
-      if (err) return done(err);
       subject.pull(function(err, repo_name, commit, time) {
         should.not.exist(err);
         expected.should.eql({repo_name: repo_name, commit: commit, time: time});
@@ -92,29 +91,39 @@ describe("queue", function () {
     describe('on error', function() {
       it('should fail if the redis operation fails', function(done) {
         var rpop = sandbox.stub(redis.RedisClient.prototype, 'rpop');
-        rpop.callsArgWithAsync(0, new Error());
+        rpop.callsArgWithAsync(1, new Error());
         subject.pull(function(err) {
           should.exist(err);
           done();
         });
       });
-    });
 
+      it('should fail if the redis operation returns non-JSON', function(done) {
+        var rpop = sandbox.stub(redis.RedisClient.prototype, 'rpop');
+        rpop.callsArgWithAsync(1, 'NOTJSON');
+        subject.pull(function(err){
+          should.exist(err);
+          done();
+        });
+      });
+    });
   });
 
-  describe('viewing queue', function() {
-    it('should work', function(done) {
-      subject.insert('repo', 'abc123', function(err) {
-        //should.not.exist(err);
-        subject.view(function(err, values) {
-          should.exist(values);
-          values.length.should.equal(1);
-          values[0].should.eql(expected);
-          done(err)
-        });
-
+  describe('viewing', function() {
+    beforeEach(function(done) {
+      subject.insert(expected.repo_name, expected.commit, function(err) {
+        done(err);
       });
     });
 
+    it('should work', function(done) {
+      subject.view(function(err, values) {
+        should.not.exist(err);
+        should.exist(values);
+        values.length.should.equal(1);
+        values[0].should.eql(expected);
+        done(err)
+      });
+    });
   });
 });
