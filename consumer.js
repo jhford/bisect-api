@@ -32,19 +32,10 @@ function claim_commit() {
 }
 
 idle_interval = setInterval(function() {
-  queue.count(function(count) {
+  queue.count(function(err, count) {
     debug('Queue has ' + count + ' items');
     for (var i = 0 ; i < count ; i++) {
       claim_commit(); 
     }
   });
 }, 10 * 1000);
-
-client.on('message', function(channel, msg) {
-  if (channel !== queue.INCOMING_QUEUE_CHANNEL) {
-    return; 
-  }
-  debug('Received a new commit');
-  claim_commit();
-});
-
