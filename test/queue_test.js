@@ -109,7 +109,7 @@ describe("queue", function () {
     });
   });
 
-  describe('viewing', function() {
+  describe('view', function() {
     beforeEach(function(done) {
       subject.insert(expected.repo_name, expected.commit, function(err) {
         done(err);

@@ -65,6 +65,9 @@ app.get('/unprocessed', function(req, res) {
 
 });
 
+app.get('/processed', function(req, res) {
+});
+
 function add_and_respond(res, repo_name, commit) {
   q.insert(repo_name, commit, function(err) {
     if (err) {
