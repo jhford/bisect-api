@@ -1,5 +1,5 @@
 var express = require('express');
-var q = require('./queue');
+var q = require('./redis-queue');
 var app = express();
 
 function head(name) {
@@ -66,6 +66,7 @@ app.get('/unprocessed', function(req, res) {
 });
 
 app.get('/processed', function(req, res) {
+  res.send(200, 'Nothing to see here yet');
 });
 
 function add_and_respond(res, repo_name, commit) {

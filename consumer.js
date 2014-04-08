@@ -1,8 +1,6 @@
 var queue = require('./queue');
 var sqlite3 = require('sqlite3').verbose();
-var redis = require('redis');
 var debug = require('debug')('consumer');
-var client = redis.createClient();
 var db = new sqlite3.Database(__dirname + '/commits.sqlite');
 var idle_interval;
 
@@ -12,25 +10,26 @@ function db_create() {
 
 function err_back(err) {
   db.close();
-  console.err("FATAL ERROR: " + err);
+  console.log("FATAL ERROR: " + err);
   process.exit(1);
 }
 
 db_create();
 
-client.subscribe(queue.INCOMING_QUEUE_CHANNEL);
-client.on('error', err_back);
 db.on('error', err_back);
 
 function claim_commit() {
-  queue.pull(function(err, repo_name, commit, time) {
+  queue.pull_all(function(err, commits) {
     if (err) return err_back(err);
     var stmt = db.prepare('INSERT INTO commits VALUES (?,?,?)');
-    stmt.run(repo_name, commit, time);
+    commits.forEach(function(val) {
+      stmt.run(val.repo_name, val.commit, val.time);
+    });
     stmt.finalize();
   });
 }
 
+claim_commit();
 idle_interval = setInterval(function() {
   queue.count(function(err, count) {
     debug('Queue has ' + count + ' items');

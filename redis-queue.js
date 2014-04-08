@@ -1,5 +1,5 @@
 var redis = require('redis');
-var debug = require('debug')('queue');
+var debug = require('debug')('redis-queue');
 var fs = require('fs');
 
 var INCOMING_QUEUE_NAME = 'bisect:incoming';
@@ -62,6 +62,38 @@ function pull(callback){
   });
 }
 
+function pull_all(callback){
+  var client = redis.createClient();
+  client.on("error", function(err) {
+    debug("ERROR: " + err);
+    if (err) {
+      return callback(err);
+    }
+  });
+  client.multi()
+    .lrange(INCOMING_QUEUE_NAME, 0, - 1)
+    .ltrim(INCOMING_QUEUE_NAME, 1, 0)
+    .exec(function(err, replies){
+      var data = new Array();
+      if (err) {
+        return callback(err);
+      }
+
+      debug('pull all reply: ' + JSON.stringify(replies));
+      replies[0].forEach(function(val) { 
+        debug('interating');
+        try {
+          data.push(JSON.parse(val));
+          debug('Inserting into array');
+        } catch(e) {
+          return callback(new Error("invalid json from queue"));
+        }
+      });
+
+      return callback(null, data);
+    });
+}
+
 function view(callback) {
   var client = redis.createClient();
   client.on("error", function(err) {
@@ -97,6 +129,7 @@ function count(callback) {
 module.exports = {
   insert: insert,
   pull: pull,
+  pull_all: pull_all,
   view: view,
   count: count,
   INCOMING_QUEUE_NAME: INCOMING_QUEUE_NAME,

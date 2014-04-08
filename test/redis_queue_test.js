@@ -2,8 +2,8 @@ var assert = require('assert');
 var should = require('should');
 var redis = require('redis');
 var sinon = require('sinon');
-var subject = require('../queue.js');
-var debug = require('debug')('queue_test');
+var subject = require('../redis-queue.js');
+var debug = require('debug')('redis-queue-test');
 
 describe("queue", function () {
   var client,
@@ -108,6 +108,38 @@ describe("queue", function () {
       });
     });
   });
+
+  describe('pulling all', function() {
+    beforeEach(function(done) {
+      subject.insert(expected.repo_name, expected.commit, function(err) {
+        subject.insert(expected.repo_name, expected.commit, function(err) {
+          subject.insert(expected.repo_name, expected.commit, function(err) {
+            done(err)
+          });
+        });
+      });
+    });
+
+    it('should get all items in the queue', function(done) {
+      subject.pull_all(function(err, list) {
+        list.should.eql([expected, expected, expected]);
+        done(err);
+      });
+    });
+
+    describe('on error', function() {
+      it('should fail if the redis operation fails', function(done) {
+        var exec = sandbox.stub(redis.Multi.prototype, 'exec');
+        exec.callsArgWithAsync(1, new Error());
+        subject.pull(function(err) {
+          should.exist(err);
+          done();
+        });
+      });
+    });
+  });
+
+
 
   describe('view', function() {
     beforeEach(function(done) {
